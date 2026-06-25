@@ -655,6 +655,15 @@
       <textarea id="note-text" placeholder="Anything else worth remembering?"></textarea>
     </div>
 
+    <div>
+      <label>Coffee Bag Photo</label>
+      <div id="photo-upload-area" onclick="document.getElementById('photo-input').click()" style="cursor:pointer;border:2px dashed var(--surface3);border-radius:12px;padding:16px;text-align:center;background:var(--surface);transition:border-color 0.2s;">
+        <div id="photo-placeholder" style="color:var(--text-muted);font-size:13px;">📷 Tap to add a photo</div>
+        <img id="photo-preview" src="" alt="" style="display:none;width:100%;border-radius:8px;object-fit:cover;max-height:160px;">
+      </div>
+      <input id="photo-input" type="file" accept="image/*" style="display:none" onchange="handlePhoto(this)">
+    </div>
+
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
       <button class="btn-save" onclick="saveNote()">Save Note</button>
@@ -722,6 +731,7 @@
   let notes = JSON.parse(localStorage.getItem('bibi-notes') || '[]');
   let modalStyle = 'MoccaMaster';
   let modalRating = 3;
+  let modalPhoto = null;
 
   function renderNotes() {
     const list = document.getElementById('notes-list');
@@ -735,6 +745,7 @@
       const tasteTags = (n.tastes || []).map(t => `<span class="taste-tag">${t}</span>`).join('');
       const otherTags = `<span class="entry-tag">${n.style}</span>`;
       return `<div class="diary-entry">
+        ${n.photo ? `<img src="${n.photo}" alt="coffee bag" style="width:100%;border-radius:10px;object-fit:cover;max-height:180px;margin-bottom:10px;">` : ''}
         <div class="entry-header">
           <span class="entry-style">${n.name || 'Unnamed Coffee'}</span>
           <div style="display:flex;align-items:center;gap:8px;">
@@ -754,8 +765,12 @@
   function openModal() {
     modalStyle = 'MoccaMaster';
     modalRating = 3;
+    modalPhoto = null;
     document.getElementById('coffee-name').value = '';
     document.getElementById('note-text').value = '';
+    document.getElementById('photo-input').value = '';
+    document.getElementById('photo-preview').style.display = 'none';
+    document.getElementById('photo-placeholder').style.display = 'block';
     document.querySelectorAll('.style-pill').forEach(p => p.classList.remove('active'));
     document.querySelector('.style-pill').classList.add('active');
     document.querySelectorAll('.tasting-pill').forEach(p => p.classList.remove('active'));
@@ -788,13 +803,36 @@
     });
   }
 
+  function handlePhoto(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const maxW = 600;
+        const scale = Math.min(1, maxW / img.width);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        modalPhoto = canvas.toDataURL('image/jpeg', 0.7);
+        document.getElementById('photo-preview').src = modalPhoto;
+        document.getElementById('photo-preview').style.display = 'block';
+        document.getElementById('photo-placeholder').style.display = 'none';
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
   function saveNote() {
     const name = document.getElementById('coffee-name').value.trim();
     const text = document.getElementById('note-text').value.trim();
     const tastes = [...document.querySelectorAll('.tasting-pill.active')].map(p => p.textContent);
     const now = new Date();
     const date = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-    notes.push({ name, style: modalStyle, rating: modalRating, tastes, text, date });
+    notes.push({ name, style: modalStyle, rating: modalRating, tastes, text, date, photo: modalPhoto });
     localStorage.setItem('bibi-notes', JSON.stringify(notes));
     renderNotes();
     closeModal();
